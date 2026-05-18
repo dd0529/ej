@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>阿胶销售积分排名</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif;
+    background: #f0f2f5;
+    color: #333;
+    min-height: 100vh;
+  }
+  .header {
+    background: linear-gradient(135deg, #8B0000, #C41E3A, #8B0000);
+    color: #fff;
+    padding: 28px 20px 20px;
+    text-align: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,.15);
+  }
+  .header h1 { font-size: 26px; font-weight: 700; letter-spacing: 4px; }
+  .header p { font-size: 14px; opacity: .85; margin-top: 6px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
+
+  /* Upload */
+  .upload-zone {
+    background: #fff;
+    border: 2px dashed #ccc;
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .25s;
+    margin-bottom: 20px;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: #C41E3A;
+    background: #fff5f5;
+  }
+  .upload-zone .icon { font-size: 48px; color: #C41E3A; margin-bottom: 10px; }
+  .upload-zone .text { font-size: 16px; color: #666; }
+  .upload-zone .hint { font-size: 13px; color: #999; margin-top: 6px; }
+  .upload-zone input[type=file] { display: none; }
+  .file-info {
+    display: none;
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    align-items: center;
+    gap: 12px;
+  }
+  .file-info .name { flex:1; font-weight:600; color:#333; }
+  .file-info .badge { background:#C41E3A; color:#fff; border-radius:20px; padding:3px 14px; font-size:13px; }
+  .file-info .remove-btn { background:none; border:1px solid #ddd; border-radius:6px; padding:4px 14px; cursor:pointer; color:#999; font-size:13px; }
+  .file-info .remove-btn:hover { border-color:#C41E3A; color:#C41E3A; }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  }
+  .stat-card .num { font-size: 28px; font-weight: 700; color: #C41E3A; }
+  .stat-card .label { font-size: 13px; color: #888; margin-top: 4px; }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+    align-items: center;
+  }
+  .controls input[type=text] {
+    flex: 1;
+    min-width: 180px;
+    padding: 10px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+  }
+  .controls input[type=text]:focus { border-color: #C41E3A; }
+  .controls select {
+    padding: 10px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    background: #fff;
+  }
+
+  /* Table */
+  .table-wrap {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.08);
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  thead {
+    background: linear-gradient(135deg, #8B0000, #C41E3A);
+    color: #fff;
+  }
+  th {
+    padding: 13px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+  }
+  th .sort-arrow { margin-left: 4px; opacity: .5; }
+  th.sorted .sort-arrow { opacity: 1; }
+  td {
+    padding: 11px 16px;
+    font-size: 14px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  tr:hover td { background: #fafafa; }
+  .rank-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .rank-1 { background: #FFD700; color: #8B4513; }
+  .rank-2 { background: #E8E8E8; color: #555; }
+  .rank-3 { background: #FFDAB9; color: #8B4513; }
+  .rank-other { background: #f5f5f5; color: #999; }
+  .point-highlight {
+    font-weight: 700;
+    color: #C41E3A;
+  }
+  .qty-bar {
+    display: inline-block;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #C41E3A, #FF6B6B);
+    min-width: 4px;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  .footer {
+    text-align: center;
+    padding: 24px 0 10px;
+    color: #bbb;
+    font-size: 12px;
+  }
+
+  @media (max-width: 600px) {
+    .header h1 { font-size: 20px; }
+    th, td { padding: 10px 10px; font-size: 13px; }
+    .stat-card .num { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>阿胶销售积分排名</h1>
+  <p>上传销售数据 &middot; 自动统计积分 &middot; 生成排名</p>
+</div>
+
+<div class="container">
+
+  <div class="upload-zone" id="uploadZone">
+    <div class="icon">&#128196;</div>
+    <div class="text">点击上传 Excel 文件或拖拽至此</div>
+    <div class="hint">支持 .xlsx 格式</div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+  </div>
+
+  <div class="file-info" id="fileInfo">
+    <span class="name" id="fileName"></span>
+    <span class="badge" id="storeCount"></span>
+    <button class="remove-btn" id="removeBtn">移除</button>
+  </div>
+
+  <div class="stats-bar" id="statsBar" style="display:none;"></div>
+
+  <div class="controls" id="controls" style="display:none;">
+    <input type="text" id="searchInput" placeholder="搜索门店名称...">
+    <select id="sortSelect">
+      <option value="rank">按排名</option>
+      <option value="points-desc">按积分从高到低</option>
+      <option value="points-asc">按积分从低到高</option>
+      <option value="name">按门店名称</option>
+    </select>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:60px;">排名</th>
+          <th>门店名称</th>
+          <th style="width:100px;">店长</th>
+          <th style="width:120px;">销售数量</th>
+          <th style="width:100px;">积分</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="5" style="text-align:center;color:#bbb;padding:60px 0;">请上传 Excel 文件开始统计</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">阿胶销售积分统计系统 &middot; 1 盒 = 10 积分</div>
+</div>
+
+<script>
+const MAX_QTY = 14;
+
+let rawData = [];
+
+// --- Elements ---
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+const fileInfo = document.getElementById('fileInfo');
+const fileName = document.getElementById('fileName');
+const storeCount = document.getElementById('storeCount');
+const removeBtn = document.getElementById('removeBtn');
+const statsBar = document.getElementById('statsBar');
+const controls = document.getElementById('controls');
+const searchInput = document.getElementById('searchInput');
+const sortSelect = document.getElementById('sortSelect');
+const tableBody = document.getElementById('tableBody');
+
+// --- Upload handlers ---
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => {
+  if (e.target.files.length) handleFile(e.target.files[0]);
+});
+removeBtn.addEventListener('click', resetUI);
+
+searchInput.addEventListener('input', render);
+sortSelect.addEventListener('change', render);
+
+// --- Parse Excel ---
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array', codepage: 65001 });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+      // Find header row — look for 销售数量
+      let headerRow = -1;
+      for (let i = 0; i < Math.min(5, json.length); i++) {
+        const row = json[i];
+        if (!row || row.length < 4) continue;
+        const vals = row.map(v => String(v || ''));
+        if (vals.some(v => v.includes('销售') || v.includes('数量') || v.includes('阿胶'))) {
+          headerRow = i;
+          break;
+        }
+      }
+      if (headerRow === -1) headerRow = 0;
+
+      // Column detection
+      const header = (json[headerRow] || []).map(v => String(v || ''));
+      const colIdx = {
+        name: -1, mgr: -1, qty: -1
+      };
+      header.forEach((v, i) => {
+        if (v.includes('门店') || v.includes('店名') || v.includes('名称')) colIdx.name = i;
+        if (v.includes('店长') || v.includes('负责人') || v.includes('店员')) colIdx.mgr = i;
+        if (v.includes('销售') || v.includes('数量') || v.includes('阿胶') || v.includes('积分')) colIdx.qty = i;
+      });
+      // fallback: use col B, C, D
+      if (colIdx.name === -1) colIdx.name = 1;
+      if (colIdx.mgr === -1) colIdx.mgr = 2;
+      if (colIdx.qty === -1) colIdx.qty = 3;
+
+      rawData = [];
+      for (let r = headerRow + 1; r < json.length; r++) {
+        const row = json[r];
+        if (!row || row.length < Math.max(colIdx.qty + 1, 4)) continue;
+        const name = String(row[colIdx.name] || '').trim();
+        if (!name || name === 'null' || name === 'None') continue;
+        const mgr = String(row[colIdx.mgr] || '').trim();
+        const qty = parseFloat(row[colIdx.qty]) || 0;
+        rawData.push({ name, mgr, qty });
+      }
+
+      if (rawData.length === 0) {
+        alert('未识别到有效数据，请确认文件格式正确。');
+        return;
+      }
+
+      onDataLoaded(file.name);
+    } catch (err) {
+      alert('解析文件失败：' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function onDataLoaded(fname) {
+  fileName.textContent = fname;
+  storeCount.textContent = rawData.length + ' 家门店';
+  fileInfo.style.display = 'flex';
+  uploadZone.style.display = 'none';
+  statsBar.style.display = 'grid';
+  controls.style.display = 'flex';
+  render();
+}
+
+function resetUI() {
+  rawData = [];
+  fileInfo.style.display = 'none';
+  uploadZone.style.display = 'block';
+  statsBar.style.display = 'none';
+  controls.style.display = 'none';
+  searchInput.value = '';
+  tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#bbb;padding:60px 0;">请上传 Excel 文件开始统计</td></tr>';
+  fileInput.value = '';
+}
+
+// --- Render ---
+function render() {
+  const query = searchInput.value.trim().toLowerCase();
+  const sortMode = sortSelect.value;
+
+  let filtered = rawData.filter(d => d.name.toLowerCase().includes(query));
+
+  // Add points & sort
+  filtered = filtered.map(d => ({ ...d, points: d.qty * 10 }));
+  const maxQty = filtered.reduce((m, d) => Math.max(m, d.qty), 1);
+
+  // Sort
+  if (sortMode === 'rank' || sortMode === 'points-desc') {
+    filtered.sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, 'zh'));
+  } else if (sortMode === 'points-asc') {
+    filtered.sort((a, b) => a.points - b.points || a.name.localeCompare(b.name, 'zh'));
+  } else if (sortMode === 'name') {
+    filtered.sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+  }
+
+  // Stats
+  const totalStores = filtered.length;
+  const totalPoints = filtered.reduce((s, d) => s + d.points, 0);
+  const totalQty = filtered.reduce((s, d) => s + d.qty, 0);
+  const avgPoints = totalStores ? (totalPoints / totalStores).toFixed(1) : 0;
+  statsBar.innerHTML = `
+    <div class="stat-card"><div class="num">${totalStores}</div><div class="label">门店数量</div></div>
+    <div class="stat-card"><div class="num">${totalQty.toFixed(2)}</div><div class="label">总销售数量</div></div>
+    <div class="stat-card"><div class="num">${totalPoints.toFixed(0)}</div><div class="label">总积分</div></div>
+    <div class="stat-card"><div class="num">${avgPoints}</div><div class="label">平均积分</div></div>
+  `;
+
+  // Table body
+  if (filtered.length === 0) {
+    tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#bbb;padding:40px 0;">未找到匹配的门店</td></tr>';
+    return;
+  }
+
+  let html = '';
+  filtered.forEach((d, i) => {
+    const rank = i + 1;
+    let rankClass = 'rank-other';
+    if (rank === 1) rankClass = 'rank-1';
+    else if (rank === 2) rankClass = 'rank-2';
+    else if (rank === 3) rankClass = 'rank-3';
+
+    const barW = Math.max((d.qty / MAX_QTY) * 100, 2);
+
+    html += `<tr>
+      <td><span class="rank-num ${rankClass}">${rank}</span></td>
+      <td><strong>${escHtml(d.name)}</strong></td>
+      <td>${d.mgr && d.mgr !== 'null' && d.mgr !== 'None' && d.mgr !== '0' ? escHtml(d.mgr) : '-'}</td>
+      <td>
+        <span style="display:inline-flex;align-items:center;gap:4px;">
+          <span class="qty-bar" style="width:${barW}px;"></span>
+          ${d.qty.toFixed(2)}
+        </span>
+      </td>
+      <td class="point-highlight">${d.points.toFixed(0)}</td>
+    </tr>`;
+  });
+  tableBody.innerHTML = html;
+}
+
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>
