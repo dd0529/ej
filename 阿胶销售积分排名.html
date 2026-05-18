@@ -170,6 +170,29 @@
     font-size: 12px;
   }
 
+  /* Buttons */
+  .btn {
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+  .btn-primary {
+    background: #C41E3A;
+    color: #fff;
+  }
+  .btn-primary:hover { background: #8B0000; }
+  .btn-outline {
+    background: #fff;
+    color: #C41E3A;
+    border: 1px solid #C41E3A;
+  }
+  .btn-outline:hover { background: #fff5f5; }
+
   @media (max-width: 600px) {
     .header h1 { font-size: 20px; }
     th, td { padding: 10px 10px; font-size: 13px; }
@@ -209,6 +232,10 @@
       <option value="points-asc">按积分从低到高</option>
       <option value="name">按门店名称</option>
     </select>
+    <div style="display:flex;gap:8px;margin-left:auto;">
+      <button class="btn btn-outline" id="exportCsvBtn">导出 CSV</button>
+      <button class="btn btn-primary" id="exportBtn">导出 Excel</button>
+    </div>
   </div>
 
   <div class="table-wrap">
@@ -418,6 +445,63 @@ function escHtml(s) {
   d.textContent = s;
   return d.innerHTML;
 }
+
+// --- Export ---
+function getExportData() {
+  // Use current filtered + sorted data
+  const query = searchInput.value.trim().toLowerCase();
+  const sortMode = sortSelect.value;
+  let data = rawData.map(d => ({ ...d, points: d.qty * 10 }));
+  if (query) data = data.filter(d => d.name.toLowerCase().includes(query));
+  if (sortMode === 'rank' || sortMode === 'points-desc') {
+    data.sort((a, b) => b.points - a.points || a.name.localeCompare(b.name, 'zh'));
+  } else if (sortMode === 'points-asc') {
+    data.sort((a, b) => a.points - b.points || a.name.localeCompare(b.name, 'zh'));
+  } else if (sortMode === 'name') {
+    data.sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+  }
+  return data.map((d, i) => ({
+    '排名': i + 1,
+    '门店名称': d.name,
+    '店长': d.mgr && d.mgr !== 'null' && d.mgr !== 'None' && d.mgr !== '0' ? d.mgr : '',
+    '销售数量': d.qty,
+    '积分': d.points
+  }));
+}
+
+document.getElementById('exportBtn').addEventListener('click', function() {
+  if (!rawData.length) { alert('请先上传数据'); return; }
+  const data = getExportData();
+  const ws = XLSX.utils.json_to_sheet(data);
+  // Column widths
+  ws['!cols'] = [{ wch: 6 }, { wch: 36 }, { wch: 12 }, { wch: 14 }, { wch: 10 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '积分排名');
+  XLSX.writeFile(wb, '阿胶销售积分排名.xlsx');
+});
+
+document.getElementById('exportCsvBtn').addEventListener('click', function() {
+  if (!rawData.length) { alert('请先上传数据'); return; }
+  const data = getExportData();
+  // BOM for Excel Chinese compatibility
+  const headers = Object.keys(data[0]);
+  let csv = '\uFEFF' + headers.join(',') + '\n';
+  data.forEach(row => {
+    csv += headers.map(h => {
+      let v = String(row[h] ?? '');
+      if (v.includes(',') || v.includes('"') || v.includes('\n')) {
+        v = '"' + v.replace(/"/g, '""') + '"';
+      }
+      return v;
+    }).join(',') + '\n';
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '阿胶销售积分排名.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
 </script>
 </body>
 </html>
